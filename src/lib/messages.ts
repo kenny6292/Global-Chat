@@ -16,7 +16,8 @@ export type Message = {
 
 export async function listConversations() {
   if (!supabase) throw new Error("Supabase is not configured yet.");
-  const { data, error } = await supabase
+  const client = supabase;
+  const { data, error } = await client
     .from("conversations")
     .select("id, created_at, updated_at, conversation_participants!inner(user_id)")
     .order("updated_at", { ascending: false });
@@ -26,7 +27,8 @@ export async function listConversations() {
 
 export async function listMessages(conversationId: string) {
   if (!supabase) throw new Error("Supabase is not configured yet.");
-  const { data, error } = await supabase
+  const client = supabase;
+  const { data, error } = await client
     .from("messages")
     .select("id, conversation_id, sender_id, body, created_at")
     .eq("conversation_id", conversationId)
@@ -37,13 +39,14 @@ export async function listMessages(conversationId: string) {
 
 export async function sendMessage(conversationId: string, body: string) {
   if (!supabase) throw new Error("Supabase is not configured yet.");
+  const client = supabase;
   const cleanBody = body.trim();
   if (!cleanBody) throw new Error("Message cannot be empty.");
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { user } } = await client.auth.getUser();
   if (!user) throw new Error("You must be signed in.");
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("messages")
     .insert({ conversation_id: conversationId, sender_id: user.id, body: cleanBody })
     .select()
@@ -55,8 +58,9 @@ export async function sendMessage(conversationId: string, body: string) {
 
 export function subscribeToConversation(conversationId: string, onMessage: (message: Message) => void) {
   if (!supabase) return () => {};
+  const client = supabase;
 
-  const channel = supabase
+  const channel = client
     .channel(`conversation:${conversationId}`)
     .on("postgres_changes", {
       event: "INSERT",
@@ -67,24 +71,25 @@ export function subscribeToConversation(conversationId: string, onMessage: (mess
     .subscribe();
 
   return () => {
-    void supabase.removeChannel(channel);
+    void client.removeChannel(channel);
   };
 }
 
 export async function createDirectConversation(otherUserId: string) {
   if (!supabase) throw new Error("Supabase is not configured yet.");
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = supabase;
+  const { data: { user } } = await client.auth.getUser();
   if (!user) throw new Error("You must be signed in.");
   if (user.id === otherUserId) throw new Error("You cannot message yourself.");
 
-  const { data: conversation, error: conversationError } = await supabase
+  const { data: conversation, error: conversationError } = await client
     .from("conversations")
     .insert({ created_by: user.id })
     .select("id, created_at, updated_at")
     .single();
   if (conversationError) throw conversationError;
 
-  const { error: participantsError } = await supabase
+  const { error: participantsError } = await client
     .from("conversation_participants")
     .insert([
       { conversation_id: conversation.id, user_id: user.id },
