@@ -42,3 +42,32 @@ export async function saveMyProfile(profile: Partial<Omit<Profile, "id">>) {
   if (error) throw error;
   return data as Profile;
 }
+
+
+export async function discoverProfiles(options: { search?: string; countryCode?: string; limit?: number } = {}): Promise<Profile[]> {
+  if (!supabase) throw new Error("Supabase is not configured yet.");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be signed in.");
+
+  const limit = Math.min(Math.max(options.limit ?? 20, 1), 50);
+  let query = supabase
+    .from("profiles")
+    .select("*")
+    .eq("onboarding_complete", true)
+    .neq("id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  const search = options.search?.trim();
+  if (search) {
+    const safe = search.replace(/[%_]/g, "\\$&");
+    query = query.or(`username.ilike.%${safe}%,display_name.ilike.%${safe}%,bio.ilike.%${safe}%`);
+  }
+  if (options.countryCode && options.countryCode !== "ALL") {
+    query = query.eq("country_code", options.countryCode.toUpperCase());
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data ?? []) as Profile[];
+}
