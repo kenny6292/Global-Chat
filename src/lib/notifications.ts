@@ -13,25 +13,28 @@ export type Notification = {
 
 export async function listNotifications(limit = 50) {
   if (!supabase) throw new Error("Supabase is not configured yet.");
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = supabase;
+  const { data: { user } } = await client.auth.getUser();
   if (!user) throw new Error("You must be signed in.");
-  const { data, error } = await supabase.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(limit);
+  const { data, error } = await client.from("notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(limit);
   if (error) throw error;
   return (data ?? []) as Notification[];
 }
 
 export async function markNotificationRead(id: string) {
   if (!supabase) throw new Error("Supabase is not configured yet.");
-  const { data: { user } } = await supabase.auth.getUser();
+  const client = supabase;
+  const { data: { user } } = await client.auth.getUser();
   if (!user) throw new Error("You must be signed in.");
-  const { error } = await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id);
+  const { error } = await client.from("notifications").update({ read_at: new Date().toISOString() }).eq("id", id).eq("user_id", user.id);
   if (error) throw error;
 }
 
 export function subscribeToNotifications(userId: string, onNotification: (notification: Notification) => void) {
   if (!supabase) return () => {};
-  const channel = supabase.channel(`notifications:${userId}`).on("postgres_changes", {
+  const client = supabase;
+  const channel = client.channel(`notifications:${userId}`).on("postgres_changes", {
     event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}`,
   }, payload => onNotification(payload.new as Notification)).subscribe();
-  return () => { void supabase.removeChannel(channel); };
+  return () => { void client.removeChannel(channel); };
 }
