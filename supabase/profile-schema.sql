@@ -46,3 +46,7 @@ drop trigger if exists profiles_updated_at on public.profiles;
 create trigger profiles_updated_at
 before update on public.profiles
 for each row execute function public.set_profile_updated_at();
+
+
+create index if not exists profiles_country_idx on public.profiles(country_code);
+create index if not exists profiles_created_at_idx on public.profiles(created_at desc);
