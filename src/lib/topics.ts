@@ -9,6 +9,13 @@ export type Topic = {
   created_at: string;
 };
 
+async function requireUserId() {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const { data, error } = await supabase.auth.getUser();
+  if (error || !data.user) throw error ?? new Error("Authentication required.");
+  return data.user.id;
+}
+
 export async function listTopics(limit = 30) {
   if (!supabase) return [] as Topic[];
   const { data, error } = await supabase
@@ -30,13 +37,13 @@ export async function listMyTopicFollows() {
 }
 
 export async function followTopic(topicId: string) {
-  if (!supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.from("topic_follows").insert({ topic_id: topicId });
+  await requireUserId();
+  const { error } = await supabase!.from("topic_follows").insert({ topic_id: topicId, user_id: (await requireUserId()) });
   if (error) throw error;
 }
 
 export async function unfollowTopic(topicId: string) {
-  if (!supabase) throw new Error("Supabase is not configured.");
-  const { error } = await supabase.from("topic_follows").delete().eq("topic_id", topicId);
+  await requireUserId();
+  const { error } = await supabase!.from("topic_follows").delete().eq("topic_id", topicId);
   if (error) throw error;
 }
