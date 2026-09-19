@@ -1,3 +1,4 @@
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
 export type PresenceStatus = "online" | "away" | "busy" | "invisible";
@@ -21,7 +22,8 @@ export async function startGlobalPresence(
 
   await new Promise<void>((resolve, reject) => {
     channel.subscribe(async (subscriptionStatus) => {
-      if (subscriptionStatus === "SUBSCRIBED") {
+      if (subscriptionStatus !== "SUBSCRIBED") return;
+      try {
         const result = await channel.track({
           userId,
           status,
@@ -29,6 +31,8 @@ export async function startGlobalPresence(
         });
         if (result !== "ok") reject(new Error("Unable to publish presence."));
         else resolve();
+      } catch (error) {
+        reject(error);
       }
     });
   });
@@ -36,8 +40,7 @@ export async function startGlobalPresence(
   return channel;
 }
 
-export async function stopPresence(channel: ReturnType<NonNullable<typeof supabase>["channel"]>) {
-  if (!supabase) return;
+export async function stopPresence(channel: RealtimeChannel) {
   await channel.untrack();
-  await supabase.removeChannel(channel);
+  if (supabase) await supabase.removeChannel(channel);
 }
