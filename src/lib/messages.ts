@@ -70,3 +70,27 @@ export function subscribeToConversation(conversationId: string, onMessage: (mess
     void supabase.removeChannel(channel);
   };
 }
+
+export async function createDirectConversation(otherUserId: string) {
+  if (!supabase) throw new Error("Supabase is not configured yet.");
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("You must be signed in.");
+  if (user.id === otherUserId) throw new Error("You cannot message yourself.");
+
+  const { data: conversation, error: conversationError } = await supabase
+    .from("conversations")
+    .insert({ created_by: user.id })
+    .select("id, created_at, updated_at")
+    .single();
+  if (conversationError) throw conversationError;
+
+  const { error: participantsError } = await supabase
+    .from("conversation_participants")
+    .insert([
+      { conversation_id: conversation.id, user_id: user.id },
+      { conversation_id: conversation.id, user_id: otherUserId },
+    ]);
+  if (participantsError) throw participantsError;
+
+  return conversation as Conversation;
+}
