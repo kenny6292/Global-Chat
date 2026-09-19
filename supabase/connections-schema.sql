@@ -22,10 +22,17 @@ create policy "Users can send connection requests"
 on public.connections for insert to authenticated
 with check ((select auth.uid()) = requester_id and requester_id <> addressee_id);
 
-create policy "Users can update their received or sent requests"
+drop policy if exists "Users can update their received or sent requests" on public.connections;
+
+create policy "Requesters can cancel pending requests"
 on public.connections for update to authenticated
-using ((select auth.uid()) in (requester_id, addressee_id))
-with check ((select auth.uid()) in (requester_id, addressee_id));
+using ((select auth.uid()) = requester_id and status = 'pending')
+with check ((select auth.uid()) = requester_id and status = 'cancelled');
+
+create policy "Addressees can accept or reject pending requests"
+on public.connections for update to authenticated
+using ((select auth.uid()) = addressee_id and status = 'pending')
+with check ((select auth.uid()) = addressee_id and status in ('accepted','rejected'));
 
 create index if not exists connections_requester_idx on public.connections(requester_id, status);
 create index if not exists connections_addressee_idx on public.connections(addressee_id, status);
