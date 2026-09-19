@@ -29,16 +29,17 @@ export async function listTopics(limit = 30) {
 
 export async function listMyTopicFollows() {
   if (!supabase) return [] as string[];
-  const { data, error } = await supabase
-    .from("topic_follows")
-    .select("topic_id");
+  const { data, error } = await supabase.from("topic_follows").select("topic_id");
   if (error) throw error;
   return (data ?? []).map((row) => row.topic_id as string);
 }
 
 export async function followTopic(topicId: string) {
-  await requireUserId();
-  const { error } = await supabase!.from("topic_follows").insert({ topic_id: topicId, user_id: (await requireUserId()) });
+  const userId = await requireUserId();
+  const { error } = await supabase!.from("topic_follows").insert({
+    topic_id: topicId,
+    user_id: userId,
+  });
   if (error) throw error;
 }
 
