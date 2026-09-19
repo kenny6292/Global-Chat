@@ -3,6 +3,7 @@
 
 create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
+  created_by uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -31,6 +32,24 @@ create index if not exists messages_conversation_created_idx
 alter table public.conversations enable row level security;
 alter table public.conversation_participants enable row level security;
 alter table public.messages enable row level security;
+
+
+
+create policy "Users can create conversations"
+on public.conversations for insert
+to authenticated
+with check (created_by = (select auth.uid()));
+
+create policy "Conversation creators can add participants"
+on public.conversation_participants for insert
+to authenticated
+with check (
+  exists (
+    select 1 from public.conversations c
+    where c.id = conversation_id
+      and c.created_by = (select auth.uid())
+  )
+);
 
 create policy "Participants can view conversations"
 on public.conversations for select
