@@ -9,6 +9,7 @@ import { countries, getCountryStats, type CountryStat } from "./lib/countries";
 import { listNotifications, markNotificationRead, subscribeToNotifications, type Notification } from "./lib/notifications";
 import { getAdminStats, listOpenReports, updateReportStatus, listAdminUsers, setUserStatus, setUserRole, listAuditLogs, type AdminStats, type AdminUser, type AdminAuditLog } from "./lib/admin";
 import { extendedFeatures, extendedFeed, extendedStories } from "./lib/extended";
+import { listFeed, createPost, togglePostReaction, listPostReactionCounts, listMyPostReactions, createComment, savePost, type Post } from "./lib/social";
 import { NextFeaturesPanel } from "./NextFeaturesPanel";
 import "./styles.css";
 
@@ -22,43 +23,47 @@ function DiscoverPanel(){const[profiles,setProfiles]=useState<Profile[]>([]);con
 
 function ExplorePanel(){
   const[active,setActive]=useState("all");
-  const[liked,setLiked]=useState<string[]>([]);
   const[post,setPost]=useState("");
-  const[posted,setPosted]=useState<string[]>([]);
+  const[posts,setPosts]=useState<Post[]>([]);
+  const[counts,setCounts]=useState<Record<string,number>>({});
+  const[liked,setLiked]=useState<string[]>([]);
+  const[saved,setSaved]=useState<string[]>([]);
+  const[loading,setLoading]=useState(true);
+  const[error,setError]=useState("");
+  const categories=[["all","All features"],["social","Social"],["community","Communities"],["professional","Opportunities"],["creator","Creators"]];
+  async function loadFeed(){
+    setLoading(true);setError("");
+    try{
+      const rows=await listFeed(30); setPosts(rows);
+      const ids=rows.map(x=>x.id);
+      const [reactionCounts,myReactions]=await Promise.all([listPostReactionCounts(ids),listMyPostReactions(ids)]);
+      setCounts(reactionCounts);setLiked(myReactions);
+    }catch(e){setError(e instanceof Error?e.message:"Could not load global feed.");}
+    finally{setLoading(false);}
+  }
+  useEffect(()=>{void loadFeed();},[]);
+  async function publish(e:React.FormEvent){
+    e.preventDefault(); if(!post.trim())return;
+    try{const created=await createPost({content:post});setPosts(x=>[created,...x]);setPost("");}
+    catch(e){setError(e instanceof Error?e.message:"Could not publish post.");}
+  }
+  async function react(id:string){
+    try{const active=await togglePostReaction(id);setLiked(x=>active?[...x,id]:x.filter(v=>v!==id));setCounts(x=>({...x,[id]:Math.max(0,(x[id]??0)+(active?1:-1))}));}
+    catch(e){setError(e instanceof Error?e.message:"Reaction failed.");}
+  }
+  async function save(id:string){
+    try{const active=await savePost(id);setSaved(x=>active?[...x,id]:x.filter(v=>v!==id));}
+    catch(e){setError(e instanceof Error?e.message:"Save failed.");}
+  }
   const visible=active==="all"?extendedFeatures:extendedFeatures.filter(f=>f.id===active);
-  const categories=[
-    ["all","All features"],["social","Social"],["community","Communities"],["professional","Opportunities"],["creator","Creators"]
-  ];
-  function toggleLike(id:string){setLiked(x=>x.includes(id)?x.filter(v=>v!==id):[...x,id]);}
   return <section className="explore-panel">
-    <div className="explore-hero">
-      <span className="eyebrow">GLOBAL CHAT ECOSYSTEM</span>
-      <h1>More than messaging. A global social network.</h1>
-      <p>Global Chat is being expanded into a place for conversations, communities, creators, opportunities, events and cross-language connections.</p>
-      <div className="feature-filters">{categories.map(([id,label])=><button key={id} className={active===id?"filter active":"filter"} onClick={()=>setActive(id)}>{label}</button>)}</div>
-    </div>
-    <div className="feature-grid">{visible.map(f=><article className="feature-card" key={f.id}>
-      <div className="feature-icon">{f.icon}</div><span className={f.status==="available"?"status ready":"status"}>{f.status==="available"?"Available in app":"Expansion planned"}</span>
-      <h3>{f.title}</h3><p>{f.description}</p>
-      <button className="secondary" disabled={f.status==="coming-soon"}>{f.status==="available"?"Open feature":"Coming soon"}</button>
-    </article>)}</div>
-    <div className="explore-columns">
-      <section className="card feed-card">
-        <div className="card-head"><div><span className="eyebrow">GLOBAL FEED</span><h2>What the world is talking about</h2></div></div>
-        <form className="post-composer" onSubmit={e=>{e.preventDefault();if(post.trim()){setPosted(x=>[post.trim(),...x]);setPost("")}}}>
-          <textarea value={post} onChange={e=>setPost(e.target.value)} maxLength={500} placeholder="Share something with the global community…"/>
-          <div><small>{post.length}/500</small><button className="primary" disabled={!post.trim()}>Publish</button></div>
-        </form>
-        {[...posted.map((text,i)=>({id:"local-"+i,name:"You",tag:"Your post",text,likes:0,comments:0})),...extendedFeed].map(item=><article className="feed-post" key={item.id}>
-          <div className="post-avatar">{item.name.slice(0,2).toUpperCase()}</div><div className="post-body"><div className="post-meta"><strong>{item.name}</strong><span>#{item.tag}</span></div><p>{item.text}</p><div className="post-actions"><button onClick={()=>toggleLike(item.id)}>♡ {item.likes+(liked.includes(item.id)?1:0)}</button><button>◌ {item.comments}</button><button>🔖 Save</button></div></div>
-        </article>)}
-      </section>
-      <aside className="card stories-card">
-        <div className="card-head"><div><span className="eyebrow">STORIES</span><h2>Explore moments</h2></div></div>
-        <div className="stories">{extendedStories.map(s=><button className="story" key={s.id}><span>{s.emoji}</span><strong>{s.name}</strong></button>)}</div>
-        <div className="mini-section"><span className="eyebrow">DISCOVER NEXT</span><h3>Build your global network</h3><p>Find language partners, communities, creators and professional connections based on interests.</p><button className="primary" onClick={()=>setActive("language")}>Find connections →</button></div>
-      </aside>
-    </div>
+    <div className="explore-hero"><span className="eyebrow">GLOBAL CHAT ECOSYSTEM</span><h1>More than messaging. A global social network.</h1><p>Discover people, communities, creators and conversations across borders.</p><div className="feature-filters">{categories.map(([id,label])=><button key={id} className={active===id?"filter active":"filter"} onClick={()=>setActive(id)}>{label}</button>)}</div></div>
+    <div className="feature-grid">{visible.map(f=><article className="feature-card" key={f.id}><div className="feature-icon">{f.icon}</div><span className={f.status==="available"?"status ready":"status"}>{f.status==="available"?"Available in app":"Expansion planned"}</span><h3>{f.title}</h3><p>{f.description}</p><button className="secondary" disabled={f.status==="coming-soon"}>{f.status==="available"?"Open feature":"Coming soon"}</button></article>)}</div>
+    <div className="explore-columns"><section className="card feed-card"><div className="card-head"><div><span className="eyebrow">GLOBAL FEED</span><h2>What the world is talking about</h2></div><button className="secondary" onClick={()=>void loadFeed()}>Refresh</button></div>
+      <form className="post-composer" onSubmit={publish}><textarea value={post} onChange={e=>setPost(e.target.value)} maxLength={10000} placeholder="Share something with the global community…"/><div><small>{post.length}/10000</small><button className="primary" disabled={!post.trim()}>Publish</button></div></form>
+      {error&&<div className="notice error">{error}</div>}
+      {loading?<div className="empty">Loading global feed…</div>:posts.length===0?<div className="empty">No public posts yet. Be the first to publish.</div>:posts.map(item=><article className="feed-post" key={item.id}><div className="post-avatar">GC</div><div className="post-body"><div className="post-meta"><strong>Global Chat member</strong><span>{new Date(item.created_at).toLocaleString()}</span></div><p>{item.content}</p><div className="post-actions"><button onClick={()=>void react(item.id)}>♡ {counts[item.id]??0}{liked.includes(item.id)?" · Liked":""}</button><button onClick={()=>{const text=window.prompt("Write a comment");if(text?.trim())void createComment(item.id,text).catch(e=>setError(e instanceof Error?e.message:"Comment failed."));}}>◌ Comment</button><button onClick={()=>void save(item.id)}>🔖 {saved.includes(item.id)?"Saved":"Save"}</button></div></div></article>)}
+    </section><aside className="card stories-card"><div className="card-head"><div><span className="eyebrow">STORIES</span><h2>Explore moments</h2></div></div><div className="stories">{extendedStories.map(s=><button className="story" key={s.id}><span>{s.emoji}</span><strong>{s.name}</strong></button>)}</div><div className="mini-section"><span className="eyebrow">DISCOVER NEXT</span><h3>Build your global network</h3><p>Find language partners, communities, creators and professional connections based on interests.</p></div></aside></div>
   </section>
 }
 
