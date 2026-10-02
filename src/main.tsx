@@ -68,3 +68,49 @@ function ExplorePanel(){
 }
 
 function AdminPanel(){const[stats,setStats]=useState<AdminStats|null>(null);const[reports,setReports]=useState<any[]>([]);const[users,setUsers]=useState<AdminUser[]>([]);const[logs,setLogs]=useState<AdminAuditLog[]>([]);const[tab,setTab]=useState<"overview"|"users"|"reports"|"audit">("overview");const[search,setSearch]=useState("");const[error,setError]=useState("");const[busy,setBusy]=useState(false);async function load(){setError("");try{const[s,r,u,l]=await Promise.all([getAdminStats(),listOpenReports(),listAdminUsers(search),listAuditLogs()]);setStats(s);setReports(r);setUsers(u);setLogs(l);}catch(e){setError(e instanceof Error?e.message:"Admin access denied.");}}useEffect(()=>{void load();},[]);async function status(id:string,s:"reviewing"|"resolved"|"dismissed"){setBusy(true);try{await updateReportStatus(id,s);await load();}catch(e){setError(e instanceof Error?e.message:"Could not update report.");}finally{setBusy(false);}}async function ban(u:AdminUser){setBusy(true);try{await setUserStatus(u.id,!u.is_banned,null,u.is_banned?"Reinstated by admin":"Banned by admin");await load();}catch(e){setError(e instanceof Error?e.message:"Could not update user.");}finally{setBusy(false);}}async function role(u:AdminUser,r:"student"|"university_admin"|"moderator"|"admin"){setBusy(true);try{await setUserRole(u.id,r);await load();}catch(e){setError(e instanceof Error?e.message:"Could not change role.");}finally{setBusy(false);}}return <section className="admin-panel"><div className="admin-hero"><span className="eyebrow">CONTROL CENTER</span><h1>Admin Control Center</h1><p>Platform operations, moderation, user access and audit activity.</p><div className="admin-tabs">{(["overview","users","reports","audit"] as const).map(x=><button className={tab===x?"filter active":"filter"} onClick={()=>setTab(x)} key={x}>{x[0].toUpperCase()+x.slice(1)}</button>)}</div></div>{error&&<div className="notice error">{error}</div>}{tab==="overview"&&<><div className="admin-stats">{stats&&Object.entries(stats).map(([k,v])=><div className="admin-stat" key={k}><strong>{String(v)}</strong><span>{k}</span></div>)}</div><div className="admin-grid"><div className="admin-module"><span className="eyebrow">MODERATION</span><h2>{reports.length} open reports</h2><button className="primary" onClick={()=>setTab("reports")}>Open moderation queue →</button></div><div className="admin-module"><span className="eyebrow">USER OPERATIONS</span><h2>{users.length} users loaded</h2><button className="secondary" onClick={()=>setTab("users")}>Manage users →</button></div><div className="admin-module"><span className="eyebrow">AUDIT</span><h2>{logs.length} recent actions</h2><button className="secondary" onClick={()=>setTab("audit")}>View audit log →</button></div></div></>}{tab==="users"&&<div className="admin-module"><div className="admin-toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, username or email…"/><button className="primary" onClick={()=>void load()}>Search</button></div><div className="admin-user-list">{users.map(u=><article className="admin-user" key={u.id}><div className="avatar">{(u.full_name||u.username||"U").slice(0,2).toUpperCase()}</div><div className="admin-user-main"><strong>{u.full_name||u.username||"Unnamed user"}</strong><small>@{u.username||"user"} · {u.email||"no email"} · {u.country||"—"}</small><span className={u.is_banned?"admin-badge danger":"admin-badge"}>{u.is_banned?"BANNED":u.role.toUpperCase()}</span></div><div className="admin-user-actions"><button disabled={busy} onClick={()=>void ban(u)}>{u.is_banned?"Reinstate":"Ban"}</button><select disabled={busy} value={u.role} onChange={e=>void role(u,e.target.value as "student"|"university_admin"|"moderator"|"admin")}><option value="student">Student</option><option value="university_admin">University Admin</option><option value="moderator">Moderator</option><option value="admin">Admin</option></select></div></article>)}</div></div>}{tab==="reports"&&<div className="admin-module"><h2>Moderation queue</h2>{reports.length===0?<div className="empty">No open reports.</div>:reports.map(r=><article className="report-card" key={r.id}><div><strong>{r.reason}</strong><span className="admin-badge">{r.status}</span></div><p>{r.details||"No additional details."}</p><small>{new Date(r.created_at).toLocaleString()}</small><div className="admin-actions"><button disabled={busy} onClick={()=>void status(r.id,"reviewing")}>Review</button><button disabled={busy} onClick={()=>void status(r.id,"resolved")}>Resolve</button><button disabled={busy} onClick={()=>void status(r.id,"dismissed")}>Dismiss</button></div></article>)}</div>}{tab==="audit"&&<div className="admin-module"><h2>Audit log</h2><div className="audit-list">{logs.map(l=><article className="audit-row" key={l.id}><strong>{l.action}</strong><small>{new Date(l.created_at).toLocaleString()}</small><code>{JSON.stringify(l.details)}</code></article>)}</div></div>}</section>}
+
+
+function App(){
+  const [session,setSession]=useState<any>(null);
+  const [profile,setProfile]=useState<Profile|null>(null);
+  const [loading,setLoading]=useState(true);
+  const [view,setView]=useState<"explore"|"discover"|"admin">("explore");
+  const [error,setError]=useState("");
+  useEffect(()=>{
+    let mounted=true;
+    async function boot(){
+      try{
+        if(!supabase){if(mounted)setLoading(false);return;}
+        const {data}=await supabase.auth.getSession();
+        if(!mounted)return;
+        setSession(data.session);
+        if(data.session){try{setProfile(await getMyProfile());}catch(e){setError(e instanceof Error?e.message:"Could not load your profile.");}}
+      }catch(e){if(mounted)setError(e instanceof Error?e.message:"Could not initialize Global Chat.");}
+      finally{if(mounted)setLoading(false);}
+    }
+    void boot();
+    if(!supabase)return ()=>{mounted=false;};
+    const {data:{subscription}}=supabase.auth.onAuthStateChange((_event,next)=>{
+      if(!mounted)return;
+      setSession(next);
+      if(!next){setProfile(null);setView("explore");return;}
+      void getMyProfile().then(setProfile).catch(e=>setError(e instanceof Error?e.message:"Could not load your profile."));
+    });
+    return ()=>{mounted=false;subscription.unsubscribe();};
+  },[]);
+  if(loading)return <div className="auth-shell"><div className="auth-card"><div className="brand"><span className="logo">◎</span><span>Global Chat</span></div><div className="empty">Loading Global Chat…</div></div></div>;
+  if(!session)return <AuthScreen/>;
+  if(!profile || !profile.onboarding_complete)return <ProfileOnboarding onComplete={()=>void getMyProfile().then(setProfile).catch(e=>setError(e instanceof Error?e.message:"Could not load profile."))}/>;
+  const isAdmin=profile.role==="admin"||profile.role==="moderator";
+  return <div className="app-shell">
+    <header className="topbar"><div className="brand"><span className="logo">◎</span><span>Global Chat</span></div><nav className="main-nav">
+      <button className={view==="explore"?"nav-button active":"nav-button"} onClick={()=>setView("explore")}>Explore</button>
+      <button className={view==="discover"?"nav-button active":"nav-button"} onClick={()=>setView("discover")}>Discover</button>
+      {isAdmin&&<button className={view==="admin"?"nav-button active":"nav-button"} onClick={()=>setView("admin")}>Admin</button>}
+    </nav><div className="topbar-actions"><span className="profile-chip">{profile.display_name||profile.username}</span><button className="secondary" onClick={async()=>{await signOut();setSession(null);setProfile(null);}}>Sign out</button></div></header>
+    {error&&<div className="notice error" style={{margin:"16px auto",maxWidth:1200}}>{error}</div>}
+    <main className="main-content">{view==="explore"?<ExplorePanel/>:view==="discover"?<DiscoverPanel/>:<AdminPanel/>}</main>
+  </div>;
+}
+
+createRoot(document.getElementById("root")!).render(<React.StrictMode><App/></React.StrictMode>);
