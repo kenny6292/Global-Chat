@@ -11,6 +11,7 @@ import { getAdminStats, listOpenReports, updateReportStatus, listAdminUsers, set
 import { extendedFeatures, extendedFeed, extendedStories } from "./lib/extended";
 import { listFeed, createPost, togglePostReaction, listPostReactionCounts, listMyPostReactions, createComment, savePost, type Post } from "./lib/social";
 import { NextFeaturesPanel } from "./NextFeaturesPanel";
+import { MessengerPanel, NotificationsPanel, GroupsPanel } from "./SocialPanels";
 import "./styles.css";
 
 const rooms = [["🌎","Global Lounge","12.4K online"],["💻","Technology","8.7K online"],["🎮","Gaming","6.2K online"],["💼","Business","4.8K online"],["🎵","Music","3.9K online"],["✈️","Travel","2.7K online"]];
