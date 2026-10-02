@@ -9,7 +9,7 @@ import { countries, getCountryStats, type CountryStat } from "./lib/countries";
 import { listNotifications, markNotificationRead, subscribeToNotifications, type Notification } from "./lib/notifications";
 import { getAdminStats, listOpenReports, updateReportStatus, listAdminUsers, setUserStatus, setUserRole, listAuditLogs, type AdminStats, type AdminUser, type AdminAuditLog } from "./lib/admin";
 import { extendedFeatures, extendedFeed, extendedStories } from "./lib/extended";
-import { listFeed, createPost, togglePostReaction, listPostReactionCounts, listMyPostReactions, createComment, savePost, type Post } from "./lib/social";
+import { listFeed, createPost, togglePostReaction, listPostReactionCounts, listMyPostReactions, createComment, savePost, listSavedPosts, type Post } from "./lib/social";
 import { NextFeaturesPanel } from "./NextFeaturesPanel";
 import { MessengerPanel, NotificationsPanel, GroupsPanel } from "./SocialPanels";
 import "./styles.css";
@@ -68,6 +68,24 @@ function ExplorePanel(){
   </section>
 }
 
+function SavedPanel(){
+  const [posts,setPosts]=useState<Post[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [error,setError]=useState("");
+  async function load(){
+    setLoading(true);setError("");
+    try{setPosts(await listSavedPosts(50));}
+    catch(e){setError(e instanceof Error?e.message:"Could not load saved posts.");}
+    finally{setLoading(false);}
+  }
+  useEffect(()=>{void load();},[]);
+  return <section className="social-panel">
+    <div className="panel-heading"><div><span className="eyebrow">SAVED</span><h1>Your saved library</h1><p>Keep useful Global Chat posts in one place.</p></div><button className="secondary" onClick={()=>void load()}>Refresh</button></div>
+    {error&&<div className="notice error">{error}</div>}
+    {loading?<div className="empty">Loading saved posts…</div>:posts.length===0?<div className="empty">You have no saved posts yet. Use Save on a feed post to keep it here.</div>:<div className="saved-list">{posts.map(item=><article className="feed-post" key={item.id}><div className="post-avatar">GC</div><div className="post-body"><div className="post-meta"><strong>Global Chat member</strong><span>{new Date(item.created_at).toLocaleString()}</span></div><p>{item.content}</p><div className="post-actions"><button onClick={async()=>{try{await savePost(item.id);setPosts(x=>x.filter(p=>p.id!==item.id));}catch(e){setError(e instanceof Error?e.message:"Could not remove saved post.");}}}>🔖 Remove from saved</button></div></div></article>)}</div>}
+  </section>;
+}
+
 function AdminPanel(){const[stats,setStats]=useState<AdminStats|null>(null);const[reports,setReports]=useState<any[]>([]);const[users,setUsers]=useState<AdminUser[]>([]);const[logs,setLogs]=useState<AdminAuditLog[]>([]);const[tab,setTab]=useState<"overview"|"users"|"reports"|"audit">("overview");const[search,setSearch]=useState("");const[error,setError]=useState("");const[busy,setBusy]=useState(false);async function load(){setError("");try{const[s,r,u,l]=await Promise.all([getAdminStats(),listOpenReports(),listAdminUsers(search),listAuditLogs()]);setStats(s);setReports(r);setUsers(u);setLogs(l);}catch(e){setError(e instanceof Error?e.message:"Admin access denied.");}}useEffect(()=>{void load();},[]);async function status(id:string,s:"reviewing"|"resolved"|"dismissed"){setBusy(true);try{await updateReportStatus(id,s);await load();}catch(e){setError(e instanceof Error?e.message:"Could not update report.");}finally{setBusy(false);}}async function ban(u:AdminUser){setBusy(true);try{await setUserStatus(u.id,!u.is_banned,null,u.is_banned?"Reinstated by admin":"Banned by admin");await load();}catch(e){setError(e instanceof Error?e.message:"Could not update user.");}finally{setBusy(false);}}async function role(u:AdminUser,r:"student"|"university_admin"|"moderator"|"admin"){setBusy(true);try{await setUserRole(u.id,r);await load();}catch(e){setError(e instanceof Error?e.message:"Could not change role.");}finally{setBusy(false);}}return <section className="admin-panel"><div className="admin-hero"><span className="eyebrow">CONTROL CENTER</span><h1>Admin Control Center</h1><p>Platform operations, moderation, user access and audit activity.</p><div className="admin-tabs">{(["overview","users","reports","audit"] as const).map(x=><button className={tab===x?"filter active":"filter"} onClick={()=>setTab(x)} key={x}>{x[0].toUpperCase()+x.slice(1)}</button>)}</div></div>{error&&<div className="notice error">{error}</div>}{tab==="overview"&&<><div className="admin-stats">{stats&&Object.entries(stats).map(([k,v])=><div className="admin-stat" key={k}><strong>{String(v)}</strong><span>{k}</span></div>)}</div><div className="admin-grid"><div className="admin-module"><span className="eyebrow">MODERATION</span><h2>{reports.length} open reports</h2><button className="primary" onClick={()=>setTab("reports")}>Open moderation queue →</button></div><div className="admin-module"><span className="eyebrow">USER OPERATIONS</span><h2>{users.length} users loaded</h2><button className="secondary" onClick={()=>setTab("users")}>Manage users →</button></div><div className="admin-module"><span className="eyebrow">AUDIT</span><h2>{logs.length} recent actions</h2><button className="secondary" onClick={()=>setTab("audit")}>View audit log →</button></div></div></>}{tab==="users"&&<div className="admin-module"><div className="admin-toolbar"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search name, username or email…"/><button className="primary" onClick={()=>void load()}>Search</button></div><div className="admin-user-list">{users.map(u=><article className="admin-user" key={u.id}><div className="avatar">{(u.full_name||u.username||"U").slice(0,2).toUpperCase()}</div><div className="admin-user-main"><strong>{u.full_name||u.username||"Unnamed user"}</strong><small>@{u.username||"user"} · {u.email||"no email"} · {u.country||"—"}</small><span className={u.is_banned?"admin-badge danger":"admin-badge"}>{u.is_banned?"BANNED":u.role.toUpperCase()}</span></div><div className="admin-user-actions"><button disabled={busy} onClick={()=>void ban(u)}>{u.is_banned?"Reinstate":"Ban"}</button><select disabled={busy} value={u.role} onChange={e=>void role(u,e.target.value as "student"|"university_admin"|"moderator"|"admin")}><option value="student">Student</option><option value="university_admin">University Admin</option><option value="moderator">Moderator</option><option value="admin">Admin</option></select></div></article>)}</div></div>}{tab==="reports"&&<div className="admin-module"><h2>Moderation queue</h2>{reports.length===0?<div className="empty">No open reports.</div>:reports.map(r=><article className="report-card" key={r.id}><div><strong>{r.reason}</strong><span className="admin-badge">{r.status}</span></div><p>{r.details||"No additional details."}</p><small>{new Date(r.created_at).toLocaleString()}</small><div className="admin-actions"><button disabled={busy} onClick={()=>void status(r.id,"reviewing")}>Review</button><button disabled={busy} onClick={()=>void status(r.id,"resolved")}>Resolve</button><button disabled={busy} onClick={()=>void status(r.id,"dismissed")}>Dismiss</button></div></article>)}</div>}{tab==="audit"&&<div className="admin-module"><h2>Audit log</h2><div className="audit-list">{logs.map(l=><article className="audit-row" key={l.id}><strong>{l.action}</strong><small>{new Date(l.created_at).toLocaleString()}</small><code>{JSON.stringify(l.details)}</code></article>)}</div></div>}</section>}
 
 
@@ -75,7 +93,7 @@ function App(){
   const [session,setSession]=useState<any>(null);
   const [profile,setProfile]=useState<Profile|null>(null);
   const [loading,setLoading]=useState(true);
-  const [view,setView]=useState<"explore"|"discover"|"messages"|"notifications"|"groups"|"events"|"admin">("explore");
+  const [view,setView]=useState<"explore"|"discover"|"messages"|"notifications"|"groups"|"events"|"saved"|"admin">("explore");
   const [error,setError]=useState("");
   useEffect(()=>{
     let mounted=true;
@@ -111,10 +129,11 @@ function App(){
       <button className={view==="notifications"?"nav-button active":"nav-button"} onClick={()=>setView("notifications")}>🔔 <span>Notifications</span></button>
       <button className={view==="groups"?"nav-button active":"nav-button"} onClick={()=>setView("groups")}>👨‍👩‍👧 <span>Groups</span></button>
       <button className={view==="events"?"nav-button active":"nav-button"} onClick={()=>setView("events")}>📅 <span>Events</span></button>
+      <button className={view==="saved"?"nav-button active":"nav-button"} onClick={()=>setView("saved")}>🔖 <span>Saved</span></button>
       {isAdmin&&<button className={view==="admin"?"nav-button active":"nav-button"} onClick={()=>setView("admin")}>⚙️ <span>Admin</span></button>}
     </nav><div className="topbar-actions"><span className="profile-chip">{profile.display_name||profile.username}</span><button className="secondary" onClick={async()=>{await signOut();setSession(null);setProfile(null);}}>Sign out</button></div></header>
     {error&&<div className="notice error" style={{margin:"16px auto",maxWidth:1200}}>{error}</div>}
-    <main className="main-content">{view==="explore"?<ExplorePanel/>:view==="discover"?<DiscoverPanel/>:view==="messages"?<MessengerPanel currentUserId={profile.id}/>:view==="notifications"?<NotificationsPanel userId={profile.id}/>:view==="groups"?<GroupsPanel/>:view==="events"?<section className="social-panel"><div className="panel-heading"><div><span className="eyebrow">EVENTS</span><h1>Discover events</h1><p>Event creation, RSVP and reminders are ready for the next data layer.</p></div></div><div className="empty">Events module is prepared for event records and RSVP workflows.</div></section>:<AdminPanel/>}</main>
+    <main className="main-content">{view==="explore"?<ExplorePanel/>:view==="discover"?<DiscoverPanel/>:view==="messages"?<MessengerPanel currentUserId={profile.id}/>:view==="notifications"?<NotificationsPanel userId={profile.id}/>:view==="groups"?<GroupsPanel/>:view==="events"?<section className="social-panel"><div className="panel-heading"><div><span className="eyebrow">EVENTS</span><h1>Discover events</h1><p>Event creation, RSVP and reminders are ready for the next data layer.</p></div></div><div className="empty">Events module is not connected yet.</div></section>:view==="saved"?<SavedPanel/>:<AdminPanel/>}</main>
     <nav className="mobile-bottom-nav">
       <button className={view==="explore"?"active":""} onClick={()=>setView("explore")}><span>🏠</span>Home</button>
       <button className={view==="discover"?"active":""} onClick={()=>setView("discover")}><span>👥</span>Friends</button>
