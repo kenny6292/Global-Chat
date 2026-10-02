@@ -82,3 +82,13 @@ export async function savePost(postId:string):Promise<boolean>{
   if(error) throw error;
   return true;
 }
+
+
+export async function listSavedPosts(limit=50):Promise<Post[]>{
+  if(!supabase) return [];
+  const {data:{user}}=await supabase.auth.getUser();
+  if(!user) throw new Error("You must be signed in.");
+  const {data,error}=await supabase.from("saved_posts").select("post_id, posts(*)").eq("user_id",user.id).order("created_at",{ascending:false}).limit(Math.min(Math.max(limit,1),100));
+  if(error) throw error;
+  return (data??[]).map((row:any)=>row.posts).filter(Boolean) as Post[];
+}
