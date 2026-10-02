@@ -104,8 +104,12 @@ function App(){
   const isAdmin=profile.role==="admin"||profile.role==="moderator";
   return <div className="app-shell">
     <header className="topbar"><div className="brand"><span className="logo">◎</span><span>Global Chat</span></div><nav className="main-nav">
-      <button className={view==="explore"?"nav-button active":"nav-button"} onClick={()=>setView("explore")}>Explore</button>
-      <button className={view==="discover"?"nav-button active":"nav-button"} onClick={()=>setView("discover")}>Discover</button>
+      <button className={view==="explore"?"nav-button active":"nav-button"} onClick={()=>setView("explore")}>🏠 Home</button>
+      <button className={view==="discover"?"nav-button active":"nav-button"} onClick={()=>setView("discover")}>👥 Friends</button>
+      <button className="nav-button" onClick={()=>setView("explore")}>💬 Messenger</button>
+      <button className="nav-button" onClick={()=>setView("explore")}>🔔 Notifications</button>
+      <button className="nav-button" onClick={()=>setView("explore")}>👨‍👩‍👧 Groups</button>
+      <button className="nav-button" onClick={()=>setView("explore")}>📅 Events</button>
       {isAdmin&&<button className={view==="admin"?"nav-button active":"nav-button"} onClick={()=>setView("admin")}>Admin</button>}
     </nav><div className="topbar-actions"><span className="profile-chip">{profile.display_name||profile.username}</span><button className="secondary" onClick={async()=>{await signOut();setSession(null);setProfile(null);}}>Sign out</button></div></header>
     {error&&<div className="notice error" style={{margin:"16px auto",maxWidth:1200}}>{error}</div>}
