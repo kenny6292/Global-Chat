@@ -140,6 +140,7 @@ function App(){
       <button className={view==="messages"?"active":""} onClick={()=>setView("messages")}><span>💬</span>Chat</button>
       <button className={view==="notifications"?"active":""} onClick={()=>setView("notifications")}><span>🔔</span>Alerts</button>
       <button className={view==="groups"?"active":""} onClick={()=>setView("groups")}><span>👥</span>Groups</button>
+  <button className={view==="saved"?"active":""} onClick={()=>setView("saved")}><span>🔖</span>Saved</button>
     </nav>
   </div>;
 }
