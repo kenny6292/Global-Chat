@@ -74,7 +74,7 @@ function App(){
   const [session,setSession]=useState<any>(null);
   const [profile,setProfile]=useState<Profile|null>(null);
   const [loading,setLoading]=useState(true);
-  const [view,setView]=useState<"explore"|"discover"|"admin">("explore");
+  const [view,setView]=useState<"explore"|"discover"|"messages"|"notifications"|"groups"|"events"|"admin">("explore");
   const [error,setError]=useState("");
   useEffect(()=>{
     let mounted=true;
@@ -104,16 +104,23 @@ function App(){
   const isAdmin=profile.role==="admin"||profile.role==="moderator";
   return <div className="app-shell">
     <header className="topbar"><div className="brand"><span className="logo">◎</span><span>Global Chat</span></div><nav className="main-nav">
-      <button className={view==="explore"?"nav-button active":"nav-button"} onClick={()=>setView("explore")}>🏠 Home</button>
-      <button className={view==="discover"?"nav-button active":"nav-button"} onClick={()=>setView("discover")}>👥 Friends</button>
-      <button className="nav-button" onClick={()=>setView("explore")}>💬 Messenger</button>
-      <button className="nav-button" onClick={()=>setView("explore")}>🔔 Notifications</button>
-      <button className="nav-button" onClick={()=>setView("explore")}>👨‍👩‍👧 Groups</button>
-      <button className="nav-button" onClick={()=>setView("explore")}>📅 Events</button>
-      {isAdmin&&<button className={view==="admin"?"nav-button active":"nav-button"} onClick={()=>setView("admin")}>Admin</button>}
+      <button className={view==="explore"?"nav-button active":"nav-button"} onClick={()=>setView("explore")}>🏠 <span>Home</span></button>
+      <button className={view==="discover"?"nav-button active":"nav-button"} onClick={()=>setView("discover")}>👥 <span>Friends</span></button>
+      <button className={view==="messages"?"nav-button active":"nav-button"} onClick={()=>setView("messages")}>💬 <span>Messenger</span></button>
+      <button className={view==="notifications"?"nav-button active":"nav-button"} onClick={()=>setView("notifications")}>🔔 <span>Notifications</span></button>
+      <button className={view==="groups"?"nav-button active":"nav-button"} onClick={()=>setView("groups")}>👨‍👩‍👧 <span>Groups</span></button>
+      <button className={view==="events"?"nav-button active":"nav-button"} onClick={()=>setView("events")}>📅 <span>Events</span></button>
+      {isAdmin&&<button className={view==="admin"?"nav-button active":"nav-button"} onClick={()=>setView("admin")}>⚙️ <span>Admin</span></button>}
     </nav><div className="topbar-actions"><span className="profile-chip">{profile.display_name||profile.username}</span><button className="secondary" onClick={async()=>{await signOut();setSession(null);setProfile(null);}}>Sign out</button></div></header>
     {error&&<div className="notice error" style={{margin:"16px auto",maxWidth:1200}}>{error}</div>}
-    <main className="main-content">{view==="explore"?<ExplorePanel/>:view==="discover"?<DiscoverPanel/>:<AdminPanel/>}</main>
+    <main className="main-content">{view==="explore"?<ExplorePanel/>:view==="discover"?<DiscoverPanel/>:view==="messages"?<MessengerPanel currentUserId={profile.id}/>:view==="notifications"?<NotificationsPanel userId={profile.id}/>:view==="groups"?<GroupsPanel/>:view==="events"?<section className="social-panel"><div className="panel-heading"><div><span className="eyebrow">EVENTS</span><h1>Discover events</h1><p>Event creation, RSVP and reminders are ready for the next data layer.</p></div></div><div className="empty">Events module is prepared for event records and RSVP workflows.</div></section>:<AdminPanel/>}</main>
+    <nav className="mobile-bottom-nav">
+      <button className={view==="explore"?"active":""} onClick={()=>setView("explore")}><span>🏠</span>Home</button>
+      <button className={view==="discover"?"active":""} onClick={()=>setView("discover")}><span>👥</span>Friends</button>
+      <button className={view==="messages"?"active":""} onClick={()=>setView("messages")}><span>💬</span>Chat</button>
+      <button className={view==="notifications"?"active":""} onClick={()=>setView("notifications")}><span>🔔</span>Alerts</button>
+      <button className={view==="groups"?"active":""} onClick={()=>setView("groups")}><span>👥</span>Groups</button>
+    </nav>
   </div>;
 }
 
